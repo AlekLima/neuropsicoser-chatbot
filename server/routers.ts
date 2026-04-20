@@ -1,28 +1,233 @@
+import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import {
+  getProfessionals,
+  getProfessionalById,
+  createProfessional,
+  updateProfessional,
+  deleteProfessional,
+  getSpecialties,
+  getInsurancePlans,
+  createInsurancePlan,
+  updateInsurancePlan,
+  getProfessionalInsurances,
+  setProfessionalInsurances,
+  getAppointments,
+  getAppointmentById,
+  updateAppointment,
+  getAllSettings,
+  setSetting,
+} from "./db";
+import { TRPCError } from "@trpc/server";
+
+// ─── Admin guard ──────────────────────────────────────────────────────────────
+const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (ctx.user.role !== "admin") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Acesso restrito a administradores." });
+  }
+  return next({ ctx });
+});
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  // ─── Specialties ───────────────────────────────────────────────────────────
+  specialties: router({
+    list: publicProcedure.query(() => getSpecialties()),
+  }),
+
+  // ─── Professionals ─────────────────────────────────────────────────────────
+  professionals: router({
+    list: adminProcedure.query(() => getProfessionals()),
+
+    getById: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .query(({ input }) => getProfessionalById(input.id)),
+
+    create: adminProcedure
+      .input(
+        z.object({
+          name: z.string().min(1),
+          crp: z.string().optional(),
+          specialtyId: z.number(),
+          price: z.string().optional(),
+          googleCalendarId: z.string().optional(),
+          insuranceIds: z.array(z.number()).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { insuranceIds, ...data } = input;
+        await createProfessional(data);
+        // Get the last inserted professional
+        const all = await getProfessionals();
+        const created = all[all.length - 1];
+        if (created && insuranceIds && insuranceIds.length > 0) {
+          await setProfessionalInsurances(created.id, insuranceIds);
+        }
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          name: z.string().min(1).optional(),
+          crp: z.string().optional(),
+          specialtyId: z.number().optional(),
+          price: z.string().optional(),
+          googleCalendarId: z.string().optional(),
+          active: z.boolean().optional(),
+          insuranceIds: z.array(z.number()).optional(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const { id, insuranceIds, ...data } = input;
+        await updateProfessional(id, data);
+        if (insuranceIds !== undefined) {
+          await setProfessionalInsurances(id, insuranceIds);
+        }
+        return { success: true };
+      }),
+
+    delete: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await deleteProfessional(input.id);
+        return { success: true };
+      }),
+
+    getInsurances: adminProcedure
+      .input(z.object({ professionalId: z.number() }))
+      .query(({ input }) => getProfessionalInsurances(input.professionalId)),
+  }),
+
+  // ─── Insurance Plans ───────────────────────────────────────────────────────
+  insurancePlans: router({
+    list: adminProcedure.query(() => getInsurancePlans()),
+
+    create: adminProcedure
+      .input(z.object({ name: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        await createInsurancePlan({ name: input.name });
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({ id: z.number(), name: z.string().optional(), active: z.boolean().optional() }))
+      .mutation(async ({ input }) => {
+        const { id, ...data } = input;
+        await updateInsurancePlan(id, data);
+        return { success: true };
+      }),
+  }),
+
+  // ─── Appointments ──────────────────────────────────────────────────────────
+  appointments: router({
+    list: adminProcedure
+      .input(
+        z.object({
+          status: z.string().optional(),
+          from: z.date().optional(),
+          to: z.date().optional(),
+        }).optional()
+      )
+      .query(({ input }) => getAppointments(input)),
+
+    getById: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .query(({ input }) => getAppointmentById(input.id)),
+
+    cancel: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        const appt = await getAppointmentById(input.id);
+        if (!appt) throw new TRPCError({ code: "NOT_FOUND" });
+
+        // Cancelar evento no Google Calendar se existir
+        if (appt.googleEventId) {
+          const professional = await getProfessionalById(appt.professionalId);
+          if (professional?.googleCalendarId) {
+            try {
+              const { deleteCalendarEvent } = await import("./googleCalendar");
+              await deleteCalendarEvent(professional.googleCalendarId, appt.googleEventId);
+            } catch (e) {
+              console.error("[Calendar] Erro ao cancelar evento:", e);
+            }
+          }
+        }
+
+        await updateAppointment(input.id, { status: "cancelled" });
+        return { success: true };
+      }),
+
+    updateStatus: adminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          status: z.enum(["scheduled", "confirmed", "cancelled", "rescheduled"]),
+        })
+      )
+      .mutation(async ({ input }) => {
+        await updateAppointment(input.id, { status: input.status });
+        return { success: true };
+      }),
+
+    // Métricas para dashboard
+    stats: adminProcedure.query(async () => {
+      const all = await getAppointments();
+      const now = new Date();
+      const thisMonth = all.filter((a) => {
+        const d = new Date(a.dateTime);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      });
+
+      const byStatus = {
+        scheduled: all.filter((a) => a.status === "scheduled").length,
+        confirmed: all.filter((a) => a.status === "confirmed").length,
+        cancelled: all.filter((a) => a.status === "cancelled").length,
+        rescheduled: all.filter((a) => a.status === "rescheduled").length,
+      };
+
+      return {
+        total: all.length,
+        thisMonth: thisMonth.length,
+        byStatus,
+      };
+    }),
+  }),
+
+  // ─── Settings ──────────────────────────────────────────────────────────────
+  settings: router({
+    getAll: adminProcedure.query(() => getAllSettings()),
+
+    update: adminProcedure
+      .input(z.object({ key: z.string(), value: z.string() }))
+      .mutation(async ({ input }) => {
+        await setSetting(input.key, input.value);
+        return { success: true };
+      }),
+
+    updateMany: adminProcedure
+      .input(z.array(z.object({ key: z.string(), value: z.string() })))
+      .mutation(async ({ input }) => {
+        for (const { key, value } of input) {
+          await setSetting(key, value);
+        }
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

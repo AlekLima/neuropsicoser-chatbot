@@ -1,0 +1,1 @@
+ALTER TABLE `conversations` MODIFY COLUMN `data` json;
