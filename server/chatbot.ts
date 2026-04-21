@@ -368,10 +368,28 @@ async function handleConfirmAppointment(
     const professional = await getProfessionalById(profId);
     const address = (await getSetting("clinic_address")) ?? "Rua Maria Tomásia, 1355 - Aldeota, Fortaleza - CE";
     const clinicName = (await getSetting("clinic_name")) ?? "Neuropsicoser";
+    const isRescheduling = data.isRescheduling as boolean | undefined;
+    const previousAppointmentId = data.previousAppointmentId as number | undefined;
 
     let googleEventId: string | undefined;
 
-    // Criar evento no Google Calendar
+    // Se for reagendamento, cancelar evento anterior
+    if (isRescheduling && previousAppointmentId) {
+      const { getAppointmentById, updateAppointment } = await import("./db");
+      const { deleteCalendarEvent } = await import("./googleCalendar");
+      const oldAppt = await getAppointmentById(previousAppointmentId);
+      if (oldAppt?.googleEventId && professional?.googleCalendarId) {
+        try {
+          await deleteCalendarEvent(professional.googleCalendarId, oldAppt.googleEventId);
+        } catch (e) {
+          console.error("[Calendar] Erro ao deletar evento anterior:", e);
+        }
+      }
+      // Marcar agendamento anterior como remarcado
+      await updateAppointment(previousAppointmentId, { status: "rescheduled" });
+    }
+
+    // Criar novo evento no Google Calendar
     if (professional?.googleCalendarId) {
       try {
         const eventId = await createCalendarEvent({
@@ -387,19 +405,40 @@ async function handleConfirmAppointment(
       }
     }
 
-    // Salvar agendamento
-    await createAppointment({
-      phone,
-      professionalId: profId,
-      specialtyId: data.specialtyId as number,
-      dateTime: new Date(slot.dateTime),
-      paymentType: data.paymentType as "particular" | "convenio",
-      insuranceId: data.insuranceId ? (data.insuranceId as number) : undefined,
-      status: "scheduled",
-      googleEventId,
-    });
+    // Salvar novo agendamento ou atualizar o anterior
+    if (isRescheduling && previousAppointmentId) {
+      const { updateAppointment } = await import("./db");
+      await updateAppointment(previousAppointmentId, {
+        dateTime: new Date(slot.dateTime),
+        status: "scheduled",
+        googleEventId,
+      });
+    } else {
+      await createAppointment({
+        phone,
+        professionalId: profId,
+        specialtyId: data.specialtyId as number,
+        dateTime: new Date(slot.dateTime),
+        paymentType: data.paymentType as "particular" | "convenio",
+        insuranceId: data.insuranceId ? (data.insuranceId as number) : undefined,
+        status: "scheduled",
+        googleEventId,
+      });
+    }
 
     await resetConversation(phone);
+
+    // Notificar profissional via WhatsApp
+    if (professional?.phone) {
+      try {
+        const patientPhone = phone;
+        const notifMsg = `📢 *Novo Agendamento!*\n\n👤 Paciente: ${patientPhone}\n📌 Especialidade: ${data.specialtyName}\n📅 Data/Hora: ${slot.label}\n💳 Pagamento: ${data.paymentType === "particular" ? "Particular" : "Convênio"}\n\nAcesse o painel para mais detalhes.`;
+        await sendTextMessage(professional.phone, notifMsg);
+        console.log(`[Notification] Profissional ${professional.name} notificado`);
+      } catch (e) {
+        console.error("[Notification] Erro ao notificar profissional:", e);
+      }
+    }
 
     let msg = `✅ *Consulta agendada com sucesso!*\n\n`;
     msg += `📌 Especialidade: ${data.specialtyName}\n`;
@@ -458,12 +497,36 @@ async function handleReminderResponse(
       `Consulta cancelada. Se quiser reagendar, é só nos chamar novamente. Até logo! 🌿`
     );
   } else if (input === "REMARCAR") {
-    await resetConversation(phone);
+    const appointmentId = data.appointmentId as number;
+    // Manter o ID do agendamento anterior para atualização depois
+    await upsertConversation(phone, STEPS.CHOOSE_SLOT, {
+      ...data,
+      isRescheduling: true,
+      previousAppointmentId: appointmentId,
+    });
     await sendTextMessage(
       phone,
-      `Para remarcar, vamos iniciar um novo atendimento. 😊`
+      `Certo! Vamos encontrar um novo horário para você. 😊\n\nEscolha um dos horários disponíveis abaixo.`
     );
-    await handleStart(phone);
+    // Recarregar os horários disponíveis
+    const professional = await getProfessionalById(data.professionalId as number);
+    if (professional?.googleCalendarId) {
+      const slots = await getAvailableSlots(professional.googleCalendarId);
+      if (slots.length > 0) {
+        let msg = `📅 Novos horários disponíveis:\n\n`;
+        slots.slice(0, 10).forEach((s, i) => {
+          msg += `${i + 1} — ${s.label}\n`;
+        });
+        msg += `\nDigite o número do horário desejado.`;
+        await upsertConversation(phone, STEPS.CHOOSE_SLOT, {
+          ...data,
+          isRescheduling: true,
+          previousAppointmentId: appointmentId,
+          availableSlots: slots.slice(0, 10),
+        });
+        await sendTextMessage(phone, msg);
+      }
+    }
   } else {
     await sendTextMessage(
       phone,

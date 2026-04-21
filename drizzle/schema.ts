@@ -41,6 +41,7 @@ export const professionals = mysqlTable("professionals", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 128 }).notNull(),
   crp: varchar("crp", { length: 32 }),
+  phone: varchar("phone", { length: 32 }),
   specialtyId: int("specialtyId").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }),
   googleCalendarId: varchar("googleCalendarId", { length: 256 }),

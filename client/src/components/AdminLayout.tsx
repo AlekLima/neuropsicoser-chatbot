@@ -6,6 +6,7 @@ import {
   Users,
   Shield,
   CalendarDays,
+  MessageCircle,
   Settings,
   LogOut,
   Menu,
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: "/professionals", label: "Profissionais", icon: Users },
   { href: "/insurance", label: "Convênios", icon: Shield },
   { href: "/appointments", label: "Agendamentos", icon: CalendarDays },
+  { href: "/conversations", label: "Conversas", icon: MessageCircle },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 
@@ -30,6 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { user, loading } = useAuth();
   const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { data: hasNewAppointments } = trpc.appointments.hasNew.useQuery(undefined, { refetchInterval: 30000 });
   const logout = trpc.auth.logout.useMutation({
     onSuccess: () => {
       toast.success("Sessão encerrada");
@@ -70,12 +73,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive = location === href;
+          const showBadge = href === "/appointments" && hasNewAppointments;
           return (
             <button
               key={href}
               onClick={() => { navigate(href); setSidebarOpen(false); }}
               className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative",
                 isActive
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -83,6 +87,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               {label}
+              {showBadge && (
+                <div className="ml-auto w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              )}
             </button>
           );
         })}
@@ -119,55 +126,52 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <SidebarContent />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden bg-black/50"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-
-      {/* Mobile Sidebar */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col lg:hidden transition-transform duration-300",
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="absolute top-4 right-4">
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="text-sidebar-foreground/60 hover:text-sidebar-foreground"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
         <SidebarContent />
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:ml-64 min-w-0">
-        {/* Mobile Header */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-border sticky top-0 z-20">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            className="text-foreground"
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <Leaf className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-sm text-foreground">Neuropsicoser</span>
+      {/* Main */}
+      <main className="flex-1 lg:ml-64 flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-border sticky top-0 z-20">
+          <div className="flex items-center justify-between px-4 lg:px-8 py-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 hover:bg-muted rounded-lg transition-colors"
+            >
+              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+            <div className="flex-1" />
+            <div className="flex items-center gap-3">
+              {hasNewAppointments && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  <span className="text-xs font-medium text-red-700">Novo agendamento</span>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="flex-1 p-6 lg:p-8 overflow-auto">
-          {children}
-        </main>
-      </div>
+        {/* Content */}
+        <div className="flex-1 overflow-auto">
+          <div className="p-4 lg:p-8">
+            {children}
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

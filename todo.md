@@ -59,3 +59,13 @@
 
 ## Checkpoint Final
 - [x] Checkpoint salvo
+
+
+## Prioridade 1 — Funcionalidades Críticas
+- [x] Reagendamento Real: fluxo completo com seleção de novo horário
+- [x] Reagendamento: atualizar agendamento no banco e Google Calendar
+- [x] Histórico de Conversas: aba no painel com histórico de mensagens
+- [x] Histórico de Conversas: visualizar etapa atual e tempo desde última interação
+- [x] Badge de Novo Agendamento no painel (ponto vermelho pulsante)
+- [x] Sincronização automática com Google Calendar após novo agendamento
+- [x] Testes unitários para Prioridade 1 (22 testes passando)

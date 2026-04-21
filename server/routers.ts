@@ -20,6 +20,8 @@ import {
   updateAppointment,
   getAllSettings,
   setSetting,
+  getConversation,
+  getDb,
 } from "./db";
 import { TRPCError } from "@trpc/server";
 
@@ -184,6 +186,12 @@ export const appRouter = router({
         return { success: true };
       }),
 
+    // Verificar se há novos agendamentos
+    hasNew: adminProcedure.query(async () => {
+      const all = await getAppointments();
+      return all.some((a) => a.status === "scheduled");
+    }),
+
     // Métricas para dashboard
     stats: adminProcedure.query(async () => {
       const all = await getAppointments();
@@ -227,6 +235,34 @@ export const appRouter = router({
         }
         return { success: true };
       }),
+  }),
+
+  // ─── Conversations ────────────────────────────────────────────────────────────
+  conversations: router({
+    getByPhone: adminProcedure
+      .input(z.object({ phone: z.string() }))
+      .query(async ({ input }) => {
+        const conv = await getConversation(input.phone);
+        return conv ? {
+          phone: conv.phone,
+          step: conv.step,
+          data: conv.data,
+          updatedAt: conv.updatedAt,
+        } : null;
+      }),
+
+    list: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      const { conversations } = await import("../drizzle/schema");
+      const result = await db.select().from(conversations).orderBy((c) => c.updatedAt).limit(50);
+      return result.map((c) => ({
+        phone: c.phone,
+        step: c.step,
+        updatedAt: c.updatedAt,
+        data: c.data,
+      }));
+    }),
   }),
 });
 
