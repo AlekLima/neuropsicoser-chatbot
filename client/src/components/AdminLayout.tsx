@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Leaf,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/insurance", label: "Convênios", icon: Shield },
   { href: "/appointments", label: "Agendamentos", icon: CalendarDays },
   { href: "/conversations", label: "Conversas", icon: MessageCircle },
+  { href: "/simulator", label: "Simulador de Chat", icon: Zap },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
 

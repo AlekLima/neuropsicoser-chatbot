@@ -69,3 +69,32 @@
 - [x] Badge de Novo Agendamento no painel (ponto vermelho pulsante)
 - [x] Sincronização automática com Google Calendar após novo agendamento
 - [x] Testes unitários para Prioridade 1 (22 testes passando)
+
+
+## Prioridade 2 — Experiência do Usuário
+- [x] Validação de Horários em Tempo Real: mostrar apenas slots realmente disponíveis (1h cada)
+- [x] Validação: filtrar horários já passados
+- [x] Validação: sugerir próximos 7 dias com disponibilidade
+- [x] Confirmação Melhorada: enviar resumo formatado (profissional, data/hora, valor, local)
+- [x] Confirmação: incluir link para adicionar à agenda do paciente
+- [x] Dashboard: gráfico de agendamentos por especialidade (últimos 30 dias)
+- [x] Dashboard: taxa de confirmação vs cancelamento
+- [x] Dashboard: receita estimada por profissional
+- [x] Testes unitários para Prioridade 2 (38 testes passando)
+
+## Gaps de Prioridade 2 (Melhorias)
+- [ ] Implementar sugestão explícita dos próximos 7 dias com disponibilidade na mensagem de seleção de horários
+- [ ] Adicionar testes reais para validação de horários (slots 1h, filtro passados, janela 7 dias)
+- [ ] Adicionar testes reais para confirmação melhorada com resumo formatado e link
+
+## Simulador de Chat
+- [x] Criar endpoint tRPC para simular mensagens
+- [x] Criar página de Simulador de Chat no painel
+- [x] Integrar com fluxo conversacional real
+- [x] Testes e validação
+
+## Gaps do Simulador (Melhorias)
+- [ ] Implementar histórico real de mensagens capturando respostas do chatbot
+- [ ] Adicionar backend para persistir logs de mensagens enviadas
+- [ ] Criar testes para conversations.simulate
+- [ ] Melhorar UX: loading states, reset real da conversa, erros

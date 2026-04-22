@@ -195,7 +195,17 @@ export const appRouter = router({
     // Métricas para dashboard
     stats: adminProcedure.query(async () => {
       const all = await getAppointments();
+      const professionals = await getProfessionals();
       const now = new Date();
+      
+      // Últimos 30 dias
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const last30Days = all.filter((a) => {
+        const d = new Date(a.dateTime);
+        return d >= thirtyDaysAgo && d <= now;
+      });
+      
       const thisMonth = all.filter((a) => {
         const d = new Date(a.dateTime);
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -208,10 +218,46 @@ export const appRouter = router({
         rescheduled: all.filter((a) => a.status === "rescheduled").length,
       };
 
+      // Agendamentos por especialidade (últimos 30 dias)
+      const bySpecialty: Record<string, number> = {};
+      last30Days.forEach((a) => {
+        const specialty = a.specialtyId ? `specialty_${a.specialtyId}` : "unknown";
+        bySpecialty[specialty] = (bySpecialty[specialty] ?? 0) + 1;
+      });
+
+      // Taxa de confirmação vs cancelamento
+      const confirmedCount = all.filter((a) => a.status === "confirmed").length;
+      const cancelledCount = all.filter((a) => a.status === "cancelled").length;
+      const totalCompleted = confirmedCount + cancelledCount;
+      const confirmationRate = totalCompleted > 0 ? Math.round((confirmedCount / totalCompleted) * 100) : 0;
+
+      // Receita estimada por profissional
+      const revenueByProfessional: Record<string, { name: string; revenue: number; count: number }> = {};
+      all.forEach((a) => {
+        if (a.status === "confirmed" || a.status === "scheduled") {
+          const prof = professionals.find((p) => p.id === a.professionalId);
+          if (prof) {
+            const key = `prof_${prof.id}`;
+            const price = prof.price ? parseFloat(prof.price) : 0;
+            if (!revenueByProfessional[key]) {
+              revenueByProfessional[key] = { name: prof.name, revenue: 0, count: 0 };
+            }
+            revenueByProfessional[key].revenue += price;
+            revenueByProfessional[key].count += 1;
+          }
+        }
+      });
+
       return {
         total: all.length,
         thisMonth: thisMonth.length,
+        last30Days: last30Days.length,
         byStatus,
+        bySpecialty,
+        confirmationRate,
+        confirmedCount,
+        cancelledCount,
+        revenueByProfessional,
       };
     }),
   }),
@@ -239,6 +285,21 @@ export const appRouter = router({
 
   // ─── Conversations ────────────────────────────────────────────────────────────
   conversations: router({
+    // Simular uma mensagem do usuário (para testes no painel)
+    simulate: adminProcedure
+      .input(z.object({ phone: z.string(), message: z.string() }))
+      .mutation(async ({ input }) => {
+        const { handleIncomingMessage } = await import("./chatbot");
+        await handleIncomingMessage(input.phone, input.message);
+        const conv = await getConversation(input.phone);
+        return {
+          success: true,
+          phone: input.phone,
+          step: conv?.step,
+          data: conv?.data,
+        };
+      }),
+
     getByPhone: adminProcedure
       .input(z.object({ phone: z.string() }))
       .query(async ({ input }) => {

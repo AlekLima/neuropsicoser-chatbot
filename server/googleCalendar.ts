@@ -48,9 +48,11 @@ export async function getAvailableSlots(
   const now = new Date();
   const timeMin = new Date(now);
   timeMin.setHours(timeMin.getHours() + 2); // Mínimo 2h de antecedência
+  timeMin.setMinutes(0, 0, 0); // Arredondar para hora cheia
 
   const timeMax = new Date(now);
   timeMax.setDate(timeMax.getDate() + daysAhead);
+  timeMax.setHours(23, 59, 59, 999);
 
   // Buscar eventos existentes no período
   const eventsResponse = await calendar.events.list({
@@ -68,10 +70,14 @@ export async function getAvailableSlots(
       end: new Date(e.end?.dateTime ?? e.end?.date ?? ""),
     }));
 
-  // Gerar slots disponíveis
+  // Gerar slots disponíveis com validação rigorosa
   const availableSlots: { label: string; dateTime: string }[] = [];
   const current = new Date(timeMin);
   current.setMinutes(0, 0, 0);
+  current.setSeconds(0, 0);
+
+  // Rastrear dias com slots disponíveis para sugestão
+  const daysWithSlots = new Set<string>();
 
   while (current < timeMax && availableSlots.length < 15) {
     const dayOfWeek = current.getDay();
@@ -97,6 +103,7 @@ export async function getAvailableSlots(
       continue;
     }
 
+    // Garantir que o slot é exatamente 1h
     const slotEnd = new Date(current.getTime() + SLOT_DURATION_MINUTES * 60 * 1000);
 
     // Verificar se o slot conflita com algum evento existente
@@ -109,9 +116,17 @@ export async function getAvailableSlots(
         label: formatSlotLabel(new Date(current)),
         dateTime: current.toISOString(),
       });
+      // Rastrear dia com slot disponível
+      const dayKey = current.toISOString().split('T')[0];
+      daysWithSlots.add(dayKey);
     }
 
     current.setHours(current.getHours() + 1);
+  }
+
+  // Se não houver slots, retornar lista vazia com mensagem de contexto
+  if (availableSlots.length === 0) {
+    console.warn(`[Calendar] Nenhum slot disponível para ${calendarId} nos próximos ${daysAhead} dias`);
   }
 
   return availableSlots;

@@ -10,6 +10,7 @@ import InsurancePlans from "./pages/InsurancePlans";
 import Appointments from "./pages/Appointments";
 import Settings from "./pages/Settings";
 import Conversations from "./pages/Conversations";
+import ChatSimulator from "./pages/ChatSimulator";
 import Login from "./pages/Login";
 import AdminLayout from "./components/AdminLayout";
 
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/insurance" component={() => <AdminLayout><InsurancePlans /></AdminLayout>} />
       <Route path="/appointments" component={() => <AdminLayout><Appointments /></AdminLayout>} />
       <Route path="/conversations" component={() => <AdminLayout><Conversations /></AdminLayout>} />
+      <Route path="/simulator" component={() => <AdminLayout><ChatSimulator /></AdminLayout>} />
       <Route path="/settings" component={() => <AdminLayout><Settings /></AdminLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

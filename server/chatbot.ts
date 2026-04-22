@@ -440,6 +440,12 @@ async function handleConfirmAppointment(
       }
     }
 
+    // Formatar data/hora para Google Calendar
+    const appointmentDate = new Date(slot.dateTime);
+    const startTime = appointmentDate.toISOString().replace(/[:-]/g, '').split('.')[0] + 'Z';
+    const endTime = new Date(appointmentDate.getTime() + 60 * 60 * 1000).toISOString().replace(/[:-]/g, '').split('.')[0] + 'Z';
+    const calendarLink = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=Consulta%20${encodeURIComponent(String(data.specialtyName))}%20-%20${encodeURIComponent(String(data.professionalName))}&dates=${startTime}/${endTime}&location=${encodeURIComponent(address)}&details=${encodeURIComponent(`Consulta com ${data.professionalName} em ${data.specialtyName}`)}`;
+
     let msg = `✅ *Consulta agendada com sucesso!*\n\n`;
     msg += `📌 Especialidade: ${data.specialtyName}\n`;
     msg += `👨‍⚕️ Profissional: ${data.professionalName}\n`;
@@ -452,6 +458,7 @@ async function handleConfirmAppointment(
       msg += `\n_Lembre-se de trazer sua carteirinha do plano e um documento com foto._\n`;
     }
     msg += `\n📍 Endereço: ${address}\n`;
+    msg += `\n🔗 Adicionar à sua agenda: ${calendarLink}\n`;
     msg += `\nChegue com 20 minutos de antecedência e traga um documento com foto.\n`;
     msg += `Caso precise cancelar ou remarcar, entre em contato com pelo menos 24 horas de antecedência.\n\n`;
     msg += `🌿 Agradecemos a sua confiança na ${clinicName}! Até breve! 😊\n\n`;

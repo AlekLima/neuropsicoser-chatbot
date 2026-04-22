@@ -1,9 +1,11 @@
 import { trpc } from "@/lib/trpc";
-import { CalendarDays, Users, CheckCircle, XCircle, Clock, TrendingUp } from "lucide-react";
+import { CalendarDays, Users, CheckCircle, XCircle, Clock, TrendingUp, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   scheduled: { label: "Agendado", color: "bg-blue-100 text-blue-800" },
@@ -12,16 +14,37 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   rescheduled: { label: "Remarcado", color: "bg-yellow-100 text-yellow-800" },
 };
 
+const COLORS = ["#1a5f3f", "#4ade80", "#d4af37", "#fbbf24"];
+
 export default function Dashboard() {
   const { data: stats } = trpc.appointments.stats.useQuery();
   const { data: appointments } = trpc.appointments.list.useQuery({});
   const { data: professionals } = trpc.professionals.list.useQuery();
+  const { data: specialties } = trpc.specialties.list.useQuery();
 
   const upcoming = (appointments ?? [])
     .filter((a) => a.status === "scheduled" || a.status === "confirmed")
     .filter((a) => new Date(a.dateTime) >= new Date())
     .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
     .slice(0, 5);
+
+  // Preparar dados para gráfico de especialidades
+  const specialtyMap = new Map(specialties?.map((s) => [s.id, s.name]) ?? []);
+  const specialtyData = Object.entries(stats?.bySpecialty ?? {}).map(([key, count]) => {
+    const specialtyId = parseInt(key.replace("specialty_", ""));
+    const name = specialtyMap.get(specialtyId) ?? `Especialidade ${specialtyId}`;
+    return { name, value: count };
+  });
+
+  // Preparar dados para gráfico de receita por profissional
+  const revenueData = Object.values(stats?.revenueByProfessional ?? {})
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5)
+    .map((item) => ({
+      name: item.name,
+      revenue: Math.round(item.revenue),
+      count: item.count,
+    }));
 
   return (
     <div className="space-y-8">
@@ -34,7 +57,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
           title="Total de Agendamentos"
           value={stats?.total ?? 0}
@@ -42,24 +65,83 @@ export default function Dashboard() {
           description="Todos os tempos"
         />
         <StatCard
-          title="Este Mês"
-          value={stats?.thisMonth ?? 0}
+          title="Últimos 30 Dias"
+          value={stats?.last30Days ?? 0}
           icon={<TrendingUp className="w-5 h-5 text-accent-foreground" />}
-          description="Agendamentos no mês atual"
+          description="Tendência recente"
           accent
         />
         <StatCard
           title="Confirmados"
-          value={stats?.byStatus?.confirmed ?? 0}
+          value={stats?.confirmedCount ?? 0}
           icon={<CheckCircle className="w-5 h-5 text-green-600" />}
           description="Presença confirmada"
         />
         <StatCard
           title="Cancelados"
-          value={stats?.byStatus?.cancelled ?? 0}
+          value={stats?.cancelledCount ?? 0}
           icon={<XCircle className="w-5 h-5 text-destructive" />}
           description="Consultas canceladas"
         />
+        <StatCard
+          title="Taxa de Confirmação"
+          value={`${stats?.confirmationRate ?? 0}%`}
+          icon={<BarChart3 className="w-5 h-5 text-blue-600" />}
+          description="Confirmados vs cancelados"
+        />
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Especialidades Chart */}
+        {specialtyData.length > 0 && (
+          <Card className="shadow-sm border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-primary" />
+                Agendamentos por Especialidade (30 dias)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={{}} className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={specialtyData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="value" fill="#1a5f3f" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Receita por Profissional */}
+        {revenueData.length > 0 && (
+          <Card className="shadow-sm border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                Receita Estimada por Profissional
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ChartContainer config={{}} className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis type="number" tick={{ fontSize: 12 }} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="revenue" fill="#4ade80" radius={[0, 8, 8, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -193,23 +275,23 @@ function StatCard({
   accent,
 }: {
   title: string;
-  value: number;
+  value: number | string;
   icon: React.ReactNode;
   description: string;
   accent?: boolean;
 }) {
   return (
-    <Card className={`shadow-sm border-border ${accent ? "bg-accent/30" : ""}`}>
-      <CardContent className="pt-5">
+    <Card className={`shadow-sm border-border ${accent ? "bg-accent/5" : ""}`}>
+      <CardContent className="pt-6">
         <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{title}</p>
-            <p className="text-3xl font-bold text-foreground mt-1">{value}</p>
+          <div className="flex-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              {title}
+            </p>
+            <p className="text-3xl font-bold text-foreground mt-2">{value}</p>
             <p className="text-xs text-muted-foreground mt-1">{description}</p>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-background shadow-sm border border-border flex items-center justify-center">
-            {icon}
-          </div>
+          <div className="ml-4">{icon}</div>
         </div>
       </CardContent>
     </Card>
