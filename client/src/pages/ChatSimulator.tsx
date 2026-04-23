@@ -27,7 +27,24 @@ export default function ChatSimulator() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { data: conversation } = trpc.conversations.getByPhone.useQuery({ phone });
+  const { data: messageHistory = [] } = trpc.conversations.getHistory.useQuery(
+    { phone },
+    { enabled: !!phone }
+  );
   const simulateMutation = trpc.conversations.simulate.useMutation();
+  const clearHistoryMutation = trpc.conversations.clearHistory.useMutation({
+    onSuccess: () => {
+      setMessages([
+        {
+          id: "1",
+          type: "bot",
+          text: "👋 Histórico limpo! Comece uma nova conversa.",
+          timestamp: new Date(),
+        },
+      ]);
+      toast.success("Histórico limpo");
+    },
+  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,11 +75,11 @@ export default function ChatSimulator() {
         message: input,
       });
 
-      // Add bot response (will be fetched from conversation state)
+      // Add bot response from chatbot
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: "bot",
-        text: `✓ Mensagem processada. Etapa atual: ${result.step}`,
+        text: result.botResponse || `✓ Mensagem processada. Etapa atual: ${result.step}`,
         timestamp: new Date(),
       };
 

@@ -10,6 +10,7 @@ import {
   conversations,
   appointments,
   settings,
+  messageLogs,
   InsertProfessional,
   InsertInsurancePlan,
   InsertAppointment,
@@ -287,4 +288,55 @@ export async function getAppointmentsDueForReminder() {
         lte(appointments.dateTime, to)
       )
     );
+}
+
+// ─── Message Logs ─────────────────────────────────────────────────────────────
+export async function logMessage(
+  phone: string,
+  direction: "inbound" | "outbound",
+  message: string,
+  step?: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  try {
+    await db.insert(messageLogs).values({
+      phone,
+      direction,
+      message,
+      step,
+    });
+  } catch (error) {
+    console.error("[MessageLog] Erro ao registrar mensagem:", error);
+  }
+}
+
+export async function getMessageHistory(phone: string, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    const result = await db
+      .select()
+      .from(messageLogs)
+      .where(eq(messageLogs.phone, phone))
+      .orderBy(desc(messageLogs.createdAt))
+      .limit(limit);
+    return result.reverse(); // Retornar em ordem cronológica
+  } catch (error) {
+    console.error("[MessageLog] Erro ao buscar histórico:", error);
+    return [];
+  }
+}
+
+export async function clearMessageHistory(phone: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  try {
+    await db.delete(messageLogs).where(eq(messageLogs.phone, phone));
+  } catch (error) {
+    console.error("[MessageLog] Erro ao limpar histórico:", error);
+  }
 }

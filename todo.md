@@ -93,8 +93,8 @@
 - [x] Integrar com fluxo conversacional real
 - [x] Testes e validação
 
-## Gaps do Simulador (Melhorias)
-- [ ] Implementar histórico real de mensagens capturando respostas do chatbot
-- [ ] Adicionar backend para persistir logs de mensagens enviadas
-- [ ] Criar testes para conversations.simulate
-- [ ] Melhorar UX: loading states, reset real da conversa, erros
+## Gaps do Simulador (Melhorias Pendentes)
+- [ ] Implementar retorno real das respostas do chatbot: fazer handlers retornarem a mensagem enviada
+- [ ] Gerar/revisar/aplicar migração de message_logs e integrar logMessage no fluxo
+- [ ] Criar testes reais para conversations.simulate, getHistory e clearHistory (sem skip)
+- [ ] Completar UX do simulador: reset funcional, loading/erro states, histórico sincronizado

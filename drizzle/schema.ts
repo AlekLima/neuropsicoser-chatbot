@@ -105,6 +105,19 @@ export const appointments = mysqlTable("appointments", {
 export type Appointment = typeof appointments.$inferSelect;
 export type InsertAppointment = typeof appointments.$inferInsert;
 
+// ─── Message Logs (histórico de mensagens do simulador) ──────────────────────
+export const messageLogs = mysqlTable("message_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  phone: varchar("phone", { length: 32 }).notNull(),
+  direction: mysqlEnum("direction", ["inbound", "outbound"]).notNull(),
+  message: text("message").notNull(),
+  step: varchar("step", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MessageLog = typeof messageLogs.$inferSelect;
+export type InsertMessageLog = typeof messageLogs.$inferInsert;
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 export const settings = mysqlTable("settings", {
   key: varchar("key", { length: 64 }).primaryKey(),

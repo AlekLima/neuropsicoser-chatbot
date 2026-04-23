@@ -290,12 +290,13 @@ export const appRouter = router({
       .input(z.object({ phone: z.string(), message: z.string() }))
       .mutation(async ({ input }) => {
         const { handleIncomingMessage } = await import("./chatbot");
-        await handleIncomingMessage(input.phone, input.message);
+        const botResponse = await handleIncomingMessage(input.phone, input.message);
         const conv = await getConversation(input.phone);
         return {
           success: true,
           phone: input.phone,
           step: conv?.step,
+          botResponse: botResponse,
           data: conv?.data,
         };
       }),
@@ -324,6 +325,29 @@ export const appRouter = router({
         data: c.data,
       }));
     }),
+
+    getHistory: adminProcedure
+      .input(z.object({ phone: z.string() }))
+      .query(async ({ input }) => {
+        const { getMessageHistory } = await import("./db");
+        const history = await getMessageHistory(input.phone, 50);
+        return history.map((m) => ({
+          id: m.id,
+          phone: m.phone,
+          direction: m.direction,
+          message: m.message,
+          step: m.step,
+          createdAt: m.createdAt,
+        }));
+      }),
+
+    clearHistory: adminProcedure
+      .input(z.object({ phone: z.string() }))
+      .mutation(async ({ input }) => {
+        const { clearMessageHistory } = await import("./db");
+        await clearMessageHistory(input.phone);
+        return { success: true };
+      }),
   }),
 });
 

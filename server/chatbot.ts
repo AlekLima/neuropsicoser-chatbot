@@ -9,6 +9,7 @@ import {
   getProfessionalInsurances,
   createAppointment,
   getSetting,
+  logMessage,
 } from "./db";
 import { sendTextMessage } from "./whatsapp";
 import { getAvailableSlots, createCalendarEvent } from "./googleCalendar";
@@ -36,14 +37,17 @@ function normalizeInput(text: string): string {
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
-export async function handleIncomingMessage(phone: string, messageText: string): Promise<void> {
+export async function handleIncomingMessage(phone: string, messageText: string): Promise<string> {
   const cleanPhone = formatPhone(phone);
   const input = normalizeInput(messageText);
+
+  // Log mensagem de entrada
+  await logMessage(cleanPhone, "inbound", messageText);
 
   // Global escape: ATENDENTE
   if (input === "ATENDENTE") {
     await handleAttendantRedirect(cleanPhone);
-    return;
+    return "Você será redirecionado para nosso atendimento humano.";
   }
 
   const conv = await getConversation(cleanPhone);
@@ -82,6 +86,7 @@ export async function handleIncomingMessage(phone: string, messageText: string):
     default:
       await handleStart(cleanPhone);
   }
+  return "Mensagem processada com sucesso.";
 }
 
 // ─── Step handlers ────────────────────────────────────────────────────────────
@@ -105,6 +110,17 @@ async function handleStart(phone: string): Promise<void> {
   await upsertConversation(phone, STEPS.CHOOSE_SPECIALTY, {
     specialties: specialties.map((s) => ({ id: s.id, name: s.name })),
   });
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
+  await logMessage(phone, "outbound", msg);
   await sendTextMessage(phone, msg);
 }
 
@@ -169,7 +185,8 @@ async function handleChooseProfessional(
   if (num === 0) {
     selectedProfessional = professionals[0];
   } else if (isNaN(num) || num < 1 || num > professionals.length) {
-    await sendTextMessage(phone, `Por favor, digite um número entre 0 e ${professionals.length}.`);
+    await logMessage(phone, "outbound", `Por favor, digite um número entre 0 e ${professionals.length}.`);
+  await sendTextMessage(phone, `Por favor, digite um número entre 0 e ${professionals.length}.`);
     return;
   } else {
     selectedProfessional = professionals[num - 1];
@@ -231,7 +248,8 @@ async function handleChoosePayment(
     });
     await sendTextMessage(phone, msg);
   } else {
-    await sendTextMessage(phone, `Por favor, digite *1* para Particular ou *2* para Convênio.`);
+    await logMessage(phone, "outbound", `Por favor, digite *1* para Particular ou *2* para Convênio.`);
+  await sendTextMessage(phone, `Por favor, digite *1* para Particular ou *2* para Convênio.`);
   }
 }
 
@@ -244,11 +262,13 @@ async function handleConfirmParticular(
     await showAvailableSlots(phone, data);
   } else if (input === "NÃO" || input === "NAO" || input === "N") {
     await resetConversation(phone);
-    await sendTextMessage(phone, `Tudo bem! Se precisar de nós, é só chamar. Até logo! 🌿`);
+    await logMessage(phone, "outbound", `Tudo bem! Se precisar de nós, é só chamar. Até logo! 🌿`);
+  await sendTextMessage(phone, `Tudo bem! Se precisar de nós, é só chamar. Até logo! 🌿`);
   } else if (input === "0") {
     await handleAttendantRedirect(phone);
   } else {
-    await sendTextMessage(phone, `Por favor, responda *SIM*, *NÃO* ou *0* para atendente.`);
+    await logMessage(phone, "outbound", `Por favor, responda *SIM*, *NÃO* ou *0* para atendente.`);
+  await sendTextMessage(phone, `Por favor, responda *SIM*, *NÃO* ou *0* para atendente.`);
   }
 }
 
@@ -271,7 +291,8 @@ async function handleChooseInsurance(
 
   const num = parseInt(input);
   if (isNaN(num) || num < 1 || num > plans.length) {
-    await sendTextMessage(phone, `Por favor, digite um número entre 1 e ${plans.length} ou 0 para opção particular.`);
+    await logMessage(phone, "outbound", `Por favor, digite um número entre 1 e ${plans.length} ou 0 para opção particular.`);
+  await sendTextMessage(phone, `Por favor, digite um número entre 1 e ${plans.length} ou 0 para opção particular.`);
     return;
   }
 
@@ -330,7 +351,8 @@ async function handleChooseSlot(
   const num = parseInt(input);
 
   if (isNaN(num) || num < 1 || num > slots.length) {
-    await sendTextMessage(phone, `Por favor, digite um número entre 1 e ${slots.length}.`);
+    await logMessage(phone, "outbound", `Por favor, digite um número entre 1 e ${slots.length}.`);
+  await sendTextMessage(phone, `Por favor, digite um número entre 1 e ${slots.length}.`);
     return;
   }
 
@@ -472,7 +494,8 @@ async function handleConfirmAppointment(
       `Tudo bem! Seu agendamento foi cancelado.\n\nSe precisar de nós, é só chamar. Até logo! 🌿`
     );
   } else {
-    await sendTextMessage(phone, `Por favor, responda *CONFIRMAR* para agendar ou *CANCELAR* para desistir.`);
+    await logMessage(phone, "outbound", `Por favor, responda *CONFIRMAR* para agendar ou *CANCELAR* para desistir.`);
+  await sendTextMessage(phone, `Por favor, responda *CONFIRMAR* para agendar ou *CANCELAR* para desistir.`);
   }
 }
 
